@@ -115,6 +115,72 @@ struct SpaceHiddenFromAIDiaryTests {
         AIUse.set(.off, in: defaults)
         #expect(!AIUse.allows(.asked, space: other, in: defaults))
     }
+
+    @Test func aSpaceThatKeepsNoThreadsKeepsItsVisitsButMakesNoThread() async {
+        let (diary, folder) = DayThreadsTests.diary()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        // Its visits come in quiet (Browser.recording without .threads).
+        await diary.plant(Self.afternoon.map {
+            DayThreadsTests.page($0.url.absoluteString, $0.title, $0.at, space: Self.hidden, quiet: true)
+        })
+        await diary.rethread(DayThreadsTests.at(9, 0))
+        #expect(await Self.threads(diary, for: .person).isEmpty)
+        // History has them all.
+        #expect(await Self.onQueue(diary) { diary.int("SELECT COUNT(*) FROM visits", []) } == 3)
+    }
+}
+
+// What a tab's visit leaves behind (Browser.recording): one question that a
+// private tab and a space's choices both answer.
+@MainActor @Suite(.serialized)
+struct SpaceRecordingTests {
+    func world(_ privacy: SpacePrivacy?) -> (Browser, Tab) {
+        let browser = Browser(windowID: UUID())
+        var space = Space(id: browser.spaceID, name: "Personal", icon: "🏠", ownSignIns: false)
+        space.privacy = privacy
+        browser.spaces = [space]
+        let tab = Tab()
+        tab.restore(url: URL(string: "http://127.0.0.1:9/recording")!, title: "Recording fixture")
+        browser.lay([tab])
+        return (browser, tab)
+    }
+
+    @Test func anOrdinarySpaceKeepsHistoryAndThreads() {
+        let (browser, tab) = world(nil); defer { tab.close(); browser.letGo() }
+        #expect(browser.recording(tab) == [.history, .threads])
+    }
+
+    @Test func aSpaceThatKeepsNoHistoryRecordsNothing() {
+        let (browser, tab) = world([.noHistory, .noThreads]); defer { tab.close(); browser.letGo() }
+        #expect(browser.recording(tab).isEmpty)
+        let (other, alone) = world(.noHistory); defer { alone.close(); other.letGo() }
+        #expect(other.recording(alone).isEmpty)
+    }
+
+    @Test func aSpaceThatKeepsNoThreadsRecordsHistoryOnly() {
+        let (browser, tab) = world(.noThreads); defer { tab.close(); browser.letGo() }
+        #expect(browser.recording(tab) == .history)
+    }
+
+    @Test func hidingFromAIStillRecordsEverything() {
+        let (browser, tab) = world(.hiddenFromAI); defer { tab.close(); browser.letGo() }
+        #expect(browser.recording(tab) == [.history, .threads])
+    }
+
+    @Test func aPrivateTabRecordsNothingInAnySpace() {
+        let (browser, tab) = world(nil); defer { tab.close(); browser.letGo() }
+        let shy = Tab(shy: true)
+        defer { shy.close() }
+        #expect(browser.recording(shy).isEmpty)
+    }
+
+    @Test func thePrivacyIsKeptAsOneNumberAndReadBack() throws {
+        var space = Space(id: UUID(), name: "Personal", icon: "🏠", ownSignIns: false)
+        space.privacy = [.hiddenFromAI, .noHistory]
+        let bytes = try JSONEncoder().encode(space)
+        #expect(String(decoding: bytes, as: UTF8.self).contains("\"privacy\":5"))
+        #expect(try JSONDecoder().decode(Space.self, from: bytes).privacy == [.hiddenFromAI, .noHistory])
+    }
 }
 
 // The agent's side: a tab in a space hidden from AI is refused by name,

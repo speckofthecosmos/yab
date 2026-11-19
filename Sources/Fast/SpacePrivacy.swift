@@ -1,21 +1,28 @@
 import Foundation
+import YabCoreClient
 
-// Settings › Spaces › a space › Privacy: choices of this Mac's, each on its
-// own (Space.privacy).
+// Settings › Spaces › a space › Privacy: three choices of this Mac's,
+// each on its own (Space.privacy).
 //
 // - Hide from AI: Yab records everything in the space for you, as in any
 //   space (history, the day's threads, suggestions), and gives none of it
 //   to an agent or a model. A private tab is hidden from AI too, but it
 //   keeps nothing; here you keep it all, and only AI is kept out.
+// - Don't Keep Day Threads: its visits are history, never threads.
+// - Don't Keep History: nothing of where you went in it is written down,
+//   as in a private tab. Its sign-ins, tabs, pins and bookmarks stay.
 //
-// Each rides one gate. A tab: Browser.whyHiddenFromAI, which a private tab
-// answers too. The diary: a Diary.Reader, which every read for AI passes. A
-// model: AIUse.allows, given the tab or space it is about to use.
+// Each rides one gate. A tab: Browser.whyHiddenFromAI and
+// Browser.recording, which a private tab answers too. The diary: a
+// Diary.Reader, which every read for AI passes. A model: AIUse.allows,
+// given the tab or space it is about to use.
 
 struct SpacePrivacy: OptionSet, Codable, Hashable {
     let rawValue: Int
 
     static let hiddenFromAI = SpacePrivacy(rawValue: 1 << 0)
+    static let noThreads = SpacePrivacy(rawValue: 1 << 1)
+    static let noHistory = SpacePrivacy(rawValue: 1 << 2)
 
     /// Taken from the list as it is read or written (Spaces.read, write):
     /// the diary's queue and the agents' read it, not only the main thread.
@@ -40,6 +47,15 @@ enum HiddenFromAI {
 
     /// What an agent hears for opening or reading in one.
     static let spaceRefusal = "the person hides that space from AI: an agent can't open pages or use its sign-ins there. Use another space."
+}
+
+/// What Yab writes down of a tab's browsing.
+struct Recording: OptionSet {
+    let rawValue: Int
+    /// A visit in History and the diary, the page's words included.
+    static let history = Recording(rawValue: 1 << 0)
+    /// That visit in the day's threads too.
+    static let threads = Recording(rawValue: 1 << 1)
 }
 
 extension Browser {
@@ -71,6 +87,18 @@ extension Browser {
         return .some(open.id)
     }
 
+    /// The one question before a visit is written down: nothing of a
+    /// private tab or an agent's own, nor of a space that keeps no
+    /// history; no threads of an agent at work in your tab, a guest's, or
+    /// a space that keeps none.
+    func recording(_ tab: Tab, in space: UUID? = nil) -> Recording {
+        guard !tab.shy, !tab.bench else { return [] }
+        let privacy = (space ?? spaceHolding(tab)).flatMap { id in spaces.first { $0.id == id } }?.privacy ?? []
+        if privacy.contains(.noHistory) { return [] }
+        if privacy.contains(.noThreads) || tab.agent != nil || tab.guest != nil { return .history }
+        return [.history, .threads]
+    }
+
     /// Settings › Spaces › Privacy. Hide from AI writes the day notes
     /// agents read again, the space's threads out of them or back in.
     func setPrivacy(_ id: UUID, _ choice: SpacePrivacy, _ on: Bool) {
@@ -80,6 +108,10 @@ extension Browser {
         spaces[at].privacy = privacy.isEmpty ? nil : privacy
         Spaces.write(spaces)
         if choice == .hiddenFromAI { Diary.shared.rewriteDayNotes(of: id.uuidString) }
+        if choice == .noHistory, let core = ChromiumProcess.shared.connectedClient {
+            let profile = ChromiumPersistentProfiles.profile(store: Spaces.store(for: id), placement: id)
+            Task { await ChromiumHistory.opened(profile, core: core) }
+        }
     }
 }
 
@@ -131,5 +163,23 @@ extension Diary {
         private var heldKeys: String {
             "SELECT key FROM visits WHERE space IN (" + hidden.sorted().map { "'" + $0.replacingOccurrences(of: "'", with: "''") + "'" }.joined(separator: ", ") + ")"
         }
+    }
+}
+
+/// Don't Keep History on Chromium's side: its profile keeps a history of its
+/// own, beside Yab's. A profile saves none while any space using it keeps
+/// none (Chrome's SavingBrowserHistoryDisabled, YabCore `profile.history`),
+/// said each time a page opens it and when the choice changes.
+@MainActor
+enum ChromiumHistory {
+    static func saving(_ profile: String) -> Bool {
+        !Spaces.read().contains { space in
+            space.has(.noHistory) && ChromiumPersistentProfiles.profile(store: Spaces.store(for: space.id), placement: space.id) == profile
+        }
+    }
+
+    static func opened(_ profile: String, core: YabCoreClient) async {
+        do { _ = try await core.request("profile.history", params: ["profile": .string(profile), "saving": .bool(saving(profile))]) }
+        catch { DebugLog.note("chromium-history", ["profile": profile, "error": String(describing: error)]) }
     }
 }

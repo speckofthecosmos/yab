@@ -100,6 +100,7 @@ does not undo browser side effects already accepted by the helper.
 | `hello` | none | Version, capabilities, known limitations |
 | `profile.open` | `profile`, `private` (default false) | Idempotent for the same privacy mode; safe alphanumeric ID |
 | `profile.close` | `profile` (no tab) | Refuses while any tab belongs to the profile |
+| `profile.history` | `profile`, `saving` | Chrome's SavingBrowserHistoryDisabled for an open space profile; replies with `saving` as Chromium now holds it |
 | `tab.create` | `profile`, `url` (default about:blank), no tab | New stable tab ID |
 | `tab.close` | none | Asynchronous close, followed by `tab.closed` |
 | `tab.adopt` | `profile`, `private` | Accept a Chrome-created tab's identity in that exact context |

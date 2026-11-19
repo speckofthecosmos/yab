@@ -22,7 +22,7 @@
 
 A **private tab** (`⇧⌘N`) has its own cookie jar, leaves nothing behind when it closes, and is invisible to agents: they can't list, read or act in it.
 
-Each space has **privacy** choices of its own (Settings › Spaces › the space › Privacy). They are this Mac's choices and are not synced.
+Each space has three **privacy** choices of its own (Settings › Spaces › the space › Privacy). They are this Mac's choices and are not synced.
 
 - **Hide from AI.** Yab keeps everything for you as in any space: history, the day's threads, suggestions, bookmarks and sign-ins. None of it reaches a model or an agent.
   - Agents can't list its tabs, read them or act in them, open pages in it or use its sign-ins. A tab of it named to one gets a plain refusal.
@@ -30,6 +30,8 @@ Each space has **privacy** choices of its own (Settings › Spaces › the space
   - The history tool, the day notes in agent memory (`memory/episodic/`) and the field's answers leave out every page opened in it, even one also opened in another space: a page's title and words are kept once, not once per space.
   - No model names its threads, its link folders, its tabs or its downloads, previews its links or drafts its forms; each keeps the name Yab gives without one.
   - Places another device opened come through Sync without their space, so the history tool can't tell them apart. Turning it on writes the day notes again without the space; a day note you edited by hand is left as you left it.
+- **Don't Keep Day Threads.** Its visits are history, as in any space, but never grouped into the day's threads, named, or written into Memory › Days and the day notes.
+- **Don't Keep History.** Nothing of where you went in it is written down, as in a private tab: no visits in History or the diary, none of a page's words, no threads, and Chromium is told to save no history for that space's sign-in (when the space shares its sign-ins with another, for both). Its sign-ins, tabs, pins and bookmarks stay. Turning it on keeps what was recorded before; Settings › History › Clear History takes that, for every space at once.
 
 ## What Yab sends
 

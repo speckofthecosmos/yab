@@ -2125,6 +2125,20 @@ static void Request(NSDictionary* request) {
     ExtensionProfileClosed(profile->first);
     profiles.erase(profile); Reply(id); return;
   }
+  if ([method isEqual:@"profile.history"]) {
+    // A space that keeps no history (Yab's Don't Keep History): Chrome's own
+    // SavingBrowserHistoryDisabled for its profile, as the policy sets it.
+    auto found = profiles.find(Key(S(p, @"profile")));
+    if (found == profiles.end() || !found->second.ready) { Reply(id, nil, @"Unknown profile"); return; }
+    if (found->second.privateMode) { Reply(id, nil, @"A private profile keeps no history"); return; }
+    static const char kDisabled[] = "history.saving_disabled";
+    auto value = CefValue::Create();
+    value->SetBool(![p[@"saving"] boolValue]);
+    CefString error;
+    if (!found->second.context->SetPreference(kDisabled, value, error)) { Reply(id, nil, @(error.ToString().c_str())); return; }
+    auto now = found->second.context->GetPreference(kDisabled);
+    Reply(id, @{@"saving": @(!(now && now->GetType() == VTYPE_BOOL && now->GetBool()))}); return;
+  }
   if ([method isEqual:@"extension.open"]) {
     std::string profile = Key(S(p, @"profile"));
     auto found = profiles.find(profile);

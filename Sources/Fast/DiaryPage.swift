@@ -99,7 +99,7 @@ extension Browser {
     /// The address changed. If it settles there without a load finishing
     /// a page moving itself along, it is remembered as a visit too.
     func noticeMove(_ tab: Tab, to url: URL) {
-        guard !tab.shy, !tab.bench, url.scheme == "http" || url.scheme == "https" else { return }
+        guard recording(tab).contains(.history), url.scheme == "http" || url.scheme == "https" else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self, weak tab] in
             guard let self, let tab, tab.address == url, tab.builtPage?.isLoading == false,
                   !DiaryPage.fresh(tab.id, url) else { return }
@@ -115,7 +115,7 @@ extension Browser {
     /// its title only.
     func noticeCommit(_ tab: Tab, at url: URL?) {
         DiaryPage.counted[tab.id] = nil
-        guard let url, !tab.shy, !tab.bench, url.scheme == "http" || url.scheme == "https" else { return }
+        guard let url, recording(tab).contains(.history), url.scheme == "http" || url.scheme == "https" else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self, weak tab] in
             guard let self, let tab, tab.address == url, tab.builtPage?.isLoading == true, DiaryPage.counted[tab.id] == nil else { return }
             DiaryPage.counted[tab.id] = url
@@ -135,11 +135,13 @@ extension Browser {
         // you straight on, a redirect, a "Redirecting…", was never a visit.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self, weak tab] in
             guard let self, let tab, tab.address == url else { return }
-            // Its space, for the day's threads; an agent at work in it keeps
-            // it out of them.
+            // Its space, for the day's threads, and what it keeps of them
+            // (Browser.recording).
             let space = self.tabs.contains { $0 === tab } ? self.spaceID
                 : self.parked.first { $0.value.tabs.contains { $0 === tab } }?.key ?? self.spaceID
-            Diary.shared.visit(url, title: tab.title, tab: tab.id, space: space, quiet: tab.agent != nil || tab.guest != nil)
+            let recording = self.recording(tab, in: space)
+            guard recording.contains(.history) else { return }
+            Diary.shared.visit(url, title: tab.title, tab: tab.id, space: space, quiet: !recording.contains(.threads))
             // Somewhere made in the app, a new page that never loaded one.
             QuickActions.shared.noticed(url, title: tab.title)
             // Nothing of what is on the page, its words, its picture,

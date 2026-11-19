@@ -325,6 +325,7 @@ final class ChromiumPage: YabTextCheckingView, PageHandle, PageAudioControl {
             try await ChromiumPrivateProfiles.open(profile, privateMode: privateMode, core: core)
             if !privateMode {
                 await ChromiumPermissions.opened(profile, core: core)
+                await ChromiumHistory.opened(profile, core: core)
                 // A clearing that failed is paid before any page of the profile.
                 await ChromiumClearingDebt.settle(profile, core: core)
             }

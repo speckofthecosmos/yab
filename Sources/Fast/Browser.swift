@@ -8119,13 +8119,14 @@ final class Browser: NSObject, ObservableObject, Relaying {
     }
 
     /// A place asked for in the field rather than reached by a link: the
-    /// history counts it as a habit. Nothing from a private tab. What comes
+    /// history counts it as a habit. Nothing from a private window or a
+    /// space that keeps no history (SpacePrivacy). What comes
     /// back is where to go: a site that answered at its other name before
     /// goes there at once, else one failure of this name gets a look at it
     /// (WWWRetry, register 1023).
     @discardableResult
     private func meant(_ url: URL) -> URL {
-        guard !privateBrowsing else { return url }
+        guard !privateBrowsing, !space.has(.noHistory) else { return url }
         let url = WWWRetry.preferred(url)
         WWWRetry.typed(url)
         history.typedIn(url)
@@ -10386,7 +10387,7 @@ extension Browser: PageEvents {
             tab.releaseNavigation()
             tab.uncover()
             tab.returnToPlace()
-            if !tab.shy && !tab.bench { history(for: tab).record(url, title: tab.title, space: visitSpace(tab)) }
+            if recording(tab).contains(.history) { history(for: tab).record(url, title: tab.title, space: visitSpace(tab)) }
             return
         }
         if floating == tab.id, floater.kind == .video, picturing == nil { refloat(tab) }
@@ -10415,7 +10416,8 @@ extension Browser: PageEvents {
         // A server on this Mac never asked about: Developer Mode, offered.
         offerDevMode(tab)
         // Counted already while it loaded (noticeCommit): only its title now.
-        if DiaryPage.counted[tab.id] == url { history(for: tab).retitle(url, title: tab.title) } else { history(for: tab).record(url, title: tab.title, space: visitSpace(tab)) }
+        if DiaryPage.counted[tab.id] == url { history(for: tab).retitle(url, title: tab.title) }
+        else if recording(tab).contains(.history) { history(for: tab).record(url, title: tab.title, space: visitSpace(tab)) }
         // What was asked of a site the field searches, and whether a site
         // it doesn't yet says how it is searched.
         Scopes.landed(on: url)

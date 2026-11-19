@@ -541,6 +541,8 @@ private struct SpacePage: View {
                 // This Mac's choices (SpacePrivacy), each on its own.
                 Section {
                     privacyRow("Hide from AI", .hiddenFromAI, of: space).settingsAnchor("space-hide-from-ai")
+                    privacyRow("Don't Keep Day Threads", .noThreads, of: space).settingsAnchor("space-no-threads")
+                    privacyRow("Don't Keep History", .noHistory, of: space).settingsAnchor("space-no-history")
                 } header: {
                     Text(SettingsWords.text("Privacy"))
                 }

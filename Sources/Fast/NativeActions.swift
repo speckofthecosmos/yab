@@ -293,7 +293,7 @@ enum NativeActions {
                                  // Profile selection changes access to signed-in accounts; the person confirms it.
                                  "space-sign-ins",
                                  // A space's privacy (SpacePrivacy): the person's to say, never an agent's.
-                                 "space-hide-from-ai",
+                                 "space-hide-from-ai", "space-no-threads", "space-no-history",
                                  // The person's consent for mail going to their AI (MailConsent): theirs alone.
                                  "mail-ahead", "mail-summaries", "mail-agents-others",
                                  // AI in Yab (AIUse): the person turns AI on or off, never an agent.
