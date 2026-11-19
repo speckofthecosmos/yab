@@ -15,12 +15,21 @@
 | Daily activity | A random installation ID in Yab's settings, and a random person ID that Sync carries to your other devices end-to-end encrypted; the site stores the IDs, which installations share a person, and the UTC days on which Yab was active, whether it was a Mac or an iPhone, and whether the Mac takes Nightly or Stable updates | You and Yab's site. Off in Settings › Privacy on the Mac (Count me in anonymous usage stats), Settings › About on the iPhone. No pages or searches are sent. |
 | Kept Store boosts | Which ones and when each was last counted, in Yab's settings; the site stores how many installations reported each boost on each day, without IDs | You and Yab's site. Off with daily activity. |
 | Invites and the member stamp | A random ID for invites alone in Yab's settings. For the stamp (You're No. …), Yab sends that ID, your first name and the first day you had Yab to the site at each launch, whether or not you sent or opened an invite. For invites, the site stores the links you made, the first names sent with them (yours, and a friend's when their Yab opens with your link), the half colors, and for best friends whether each one's Yab was open in the last few minutes, only while you let them see it. [docs/invites.md](invites.md) | You, your friends' pages, and Yab's site. |
-| Pages an agent reads | Sent to the agent's model provider while it works on your task | The provider, under its own terms. An agent never sees a private tab. |
+| Pages an agent reads | Sent to the agent's model provider while it works on your task | The provider, under its own terms. An agent never sees a private tab, nor a space hidden from AI. |
 | Sync, if you turn it on | Spaces, tabs, bookmarks, settings and a few small files of yours, each sealed on your Mac with a key only your devices have (iCloud Keychain carries it to your other Macs), kept on Yab's sync server as boxes it can't open under names it can't read | Your devices. The server sees how many records there are, their sizes and when they change. [docs/sync.md](sync.md). |
 | Handoff | The address and title of the page in front, offered to your iPhone and other Macs signed in to the same Apple ID; never from a private tab, and Yab's servers are not involved. [docs/handoff.md](handoff.md). | Your devices, over Apple's Handoff. |
 | Anything else | Nowhere. There is no account. | – |
 
 A **private tab** (`⇧⌘N`) has its own cookie jar, leaves nothing behind when it closes, and is invisible to agents: they can't list, read or act in it.
+
+Each space has **privacy** choices of its own (Settings › Spaces › the space › Privacy). They are this Mac's choices and are not synced.
+
+- **Hide from AI.** Yab keeps everything for you as in any space: history, the day's threads, suggestions, bookmarks and sign-ins. None of it reaches a model or an agent.
+  - Agents can't list its tabs, read them or act in them, open pages in it or use its sign-ins. A tab of it named to one gets a plain refusal.
+  - The chat never takes one of its pages, its selection or a picture of it, and ⌘J offers nothing there.
+  - The history tool, the day notes in agent memory (`memory/episodic/`) and the field's answers leave out every page opened in it, even one also opened in another space: a page's title and words are kept once, not once per space.
+  - No model names its threads, its link folders, its tabs or its downloads, previews its links or drafts its forms; each keeps the name Yab gives without one.
+  - Places another device opened come through Sync without their space, so the history tool can't tell them apart. Turning it on writes the day notes again without the space; a day note you edited by hand is left as you left it.
 
 ## What Yab sends
 

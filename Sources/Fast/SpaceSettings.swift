@@ -537,6 +537,14 @@ private struct SpacePage: View {
                 }
                 .settingsAnchor("space-sign-ins")
             }
+            if let space {
+                // This Mac's choices (SpacePrivacy), each on its own.
+                Section {
+                    privacyRow("Hide from AI", .hiddenFromAI, of: space).settingsAnchor("space-hide-from-ai")
+                } header: {
+                    Text(SettingsWords.text("Privacy"))
+                }
+            }
             Section {
                 SettingsRow("Save downloads to", detail: "For this Space on this Mac.") {
                     DropMenu("Save downloads to", options: downloadChoices, selection: Binding(
@@ -591,6 +599,18 @@ private struct SpacePage: View {
     }
 
     // MARK: the top
+
+    private func privacyRow(_ title: String, _ choice: SpacePrivacy, of space: Space) -> some View {
+        SettingsRow(title) {
+            Toggle(SettingsText.plain(SettingsWords.text(title)), isOn: Binding(
+                get: { space.has(choice) },
+                set: { browser.setPrivacy(space.id, choice, $0) }
+            ))
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .controlSize(.small)
+        }
+    }
 
     private var hero: some View {
         let color = form.paint.color(dark: scheme == .dark)

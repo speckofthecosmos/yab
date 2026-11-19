@@ -47,7 +47,7 @@ enum AskFromDay {
         let span = DayThreads.span(words, now: now)
         let from = span?.from ?? now.addingTimeInterval(-7 * 86_400)
         let to = span?.to ?? now.addingTimeInterval(60)
-        let threads = await diary.threads(from: from, to: to)
+        let threads = await diary.threads(from: from, to: to, for: .ai)
         let rest = span?.rest ?? words
         let terms = Diary.terms(rest).filter { $0.count >= 3 && !DayThreads.common.contains($0) && !askWords.contains($0) }
         let picking = DayThreads.picksUp(words)

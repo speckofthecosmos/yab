@@ -1768,9 +1768,9 @@ extension Agents {
 extension Hints {
     /// The actions for the tab in front, if any.
     /// None on a private tab: an agent can't read or act in one, so none
-    /// is offered there.
+    /// is offered there, nor in a space hidden from AI.
     func actions(on tab: Tab?) -> [Skills.Action] {
-        guard let tab, !tab.isBlank, !tab.shy, tab.worker == nil else { return [] }
+        guard let tab, !tab.isBlank, !tab.hiddenFromAI, tab.worker == nil else { return [] }
         return (extra[tab.id].map { [$0] } ?? []) + Skills.actions(for: tab.address)
     }
 }

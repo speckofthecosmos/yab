@@ -49,6 +49,7 @@ final class ShortNames: ObservableObject {
         guard ruled.count > Self.long else { return ruled == tab.title ? nil : ruled }
         let key = Self.key(url, ruled)
         if let said = known[key] { return said.isEmpty ? ruled : said }
+        guard AIUse.allows(.background, for: tab) else { return ruled }
         ask(ruled, key: key, for: tab)
         return ruled
     }

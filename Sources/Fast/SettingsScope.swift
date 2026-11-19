@@ -33,7 +33,7 @@ enum SettingsScope: Equatable {
         // Sign-ins chooses shared versus isolated storage for this space;
         // it does not claim the shared cookies belong to this space alone.
         case "space-name", "space-emoji", "space-color", "space-sign-ins",
-             "space-delete", "space-search", "space-search-custom":
+             "space-delete", "space-search", "space-search-custom", "space-hide-from-ai":
             return .space
         default:
             return nil

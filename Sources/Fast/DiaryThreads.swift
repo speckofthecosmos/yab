@@ -204,14 +204,7 @@ extension Diary {
     /// opened (`day`). A month grouped at once never asks for a month of names.
     func nameSoon(day: String? = nil) {
         guard db != nil else { return }
-        let now = Date().timeIntervalSince1970
-        let scope = day == nil ? "t.start >= ?" : "t.day = ?"
-        let rows = query("""
-        SELECT t.id FROM threads t WHERE t.named = 0 AND \(scope)
-          AND (t.end < ? OR (SELECT COUNT(DISTINCT key) FROM visits v WHERE v.thread = t.id) >= 4)
-        ORDER BY t.end DESC LIMIT 40
-        """, [day ?? (now - 2 * 86_400), now - DayThreads.gap] as [Any])
-        let wanted = rows.compactMap { $0[0] as? Int64 }.filter { !threadAsked.contains($0) }.prefix(day == nil ? 6 : 12)
+        let wanted = waitingForNames(day: day).filter { !threadAsked.contains($0) }.prefix(day == nil ? 6 : 12)
         guard !wanted.isEmpty else { return }
         var asks: [(Int64, String)] = []
         for id in wanted {
@@ -235,6 +228,18 @@ extension Diary {
                 }
             }
         }
+    }
+
+    /// The threads a name could be asked for, newest first: a model names
+    /// them, so a thread hidden from AI keeps the name its titles give.
+    func waitingForNames(day: String? = nil, now: Date = Date(), for reader: Reader = .ai) -> [Int64] {
+        let now = now.timeIntervalSince1970
+        let scope = day == nil ? "t.start >= ?" : "t.day = ?"
+        return query("""
+        SELECT t.id FROM threads t WHERE t.named = 0 AND \(scope) AND \(reader.thread("t.id"))
+          AND (t.end < ? OR (SELECT COUNT(DISTINCT key) FROM visits v WHERE v.thread = t.id) >= 4)
+        ORDER BY t.end DESC LIMIT 40
+        """, [day ?? (now - 2 * 86_400), now - DayThreads.gap] as [Any]).compactMap { $0[0] as? Int64 }
     }
 
     /// A day's page opened: its threads named, if they aren't yet.
@@ -294,9 +299,9 @@ extension Diary {
         }
     }
 
-    func threads(from: Date, to: Date) async -> [DayThread] {
+    func threads(from: Date, to: Date, for reader: Reader = .person) async -> [DayThread] {
         await withCheckedContinuation { done in
-            queue.async { done.resume(returning: self.threadsNow(from: from, to: to)) }
+            queue.async { done.resume(returning: self.threadsNow(from: from, to: to, for: reader)) }
         }
     }
 
@@ -311,9 +316,10 @@ extension Diary {
         await withCheckedContinuation { done in queue.async { done.resume(returning: self.threadStats) } }
     }
 
-    func threadsNow(from: Date, to: Date) -> [DayThread] {
+    func threadsNow(from: Date, to: Date, for reader: Reader = .person) -> [DayThread] {
         guard db != nil else { return [] }
-        let rows = query("SELECT id FROM threads WHERE end >= ? AND start < ? ORDER BY start", [from.timeIntervalSince1970, to.timeIntervalSince1970])
+        let rows = query("SELECT id FROM threads WHERE end >= ? AND start < ? AND \(reader.thread("id")) ORDER BY start",
+                         [from.timeIntervalSince1970, to.timeIntervalSince1970])
         return rows.compactMap { ($0[0] as? Int64).flatMap(threadNow) }
     }
 

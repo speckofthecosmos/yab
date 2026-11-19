@@ -385,7 +385,7 @@ extension Browser {
     func warmDrafts(_ tab: Tab) {
         // Not an agent's own tab: it writes its drafts itself, and reading
         // the form of every page it opens is work for nothing.
-        guard FormFill.on, FormDraft.on, !tab.shy, tab.agent == nil, FormDraft.shared.usable, !FormDraft.shared.running else { return }
+        guard FormFill.on, FormDraft.on, !tab.hiddenFromAI, tab.agent == nil, FormDraft.shared.usable, !FormDraft.shared.running else { return }
         guard let found = Shell.cached else {
             Task { _ = await Shell.find(resolvingLogin: false) }
             return
@@ -419,7 +419,7 @@ extension Browser {
             let key = FormAnswers.normal($0.field.label)
             return tab.wallet.form.drafts[key] == nil && !tab.wallet.form.drafting.contains(key)
         }
-        guard !asked.isEmpty, FormDraft.on else { return }
+        guard !asked.isEmpty, FormDraft.on, AIUse.allows(.background, for: tab) else { return }
         let keys = Set(asked.map { FormAnswers.normal($0.field.label) })
         tab.wallet.form.drafting.formUnion(keys)
         tab.builtPage?.call("return window.__yabForm ? window.__yabForm.context() : null",

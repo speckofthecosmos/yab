@@ -273,7 +273,7 @@ extension Agents {
         // words, and its answer opens in the column.
         let textOnly = (choice?.cli ?? ModelDefaults.shared.pick(.tasks).cli) == "gemini" && !GeminiSupport.toolsProven
         var context = context
-        if textOnly, let tab, !tab.shy, !context.contains(.page(tab)) { context.append(.page(tab)) }
+        if textOnly, let tab, !browser.hiddenFromAI(tab), !context.contains(.page(tab)) { context.append(.page(tab)) }
         let seen = Agents.given(context, browser: browser) + Agents.spaceLine(browser)
         if let tab, !textOnly {
             let url = tab.address?.absoluteString ?? ""
@@ -450,8 +450,8 @@ extension Agents {
         guard browser.spacesShown, browser.spaces.count > 1,
               ProcessInfo.processInfo.environment["YAB_SPACE_HINT"] != "off" else { return "" }
         let others = browser.spaces.filter { $0.id != browser.spaceID }.map { "«\($0.name)»" }.joined(separator: ", ")
-        // The person's own tabs only: no private one, no agent's.
-        let titles = browser.tabs.filter { !$0.shy && !$0.bench && $0.agent == nil }
+        // The person's own tabs only: none hidden from AI, no agent's.
+        let titles = browser.tabs.filter { !browser.hiddenFromAI($0) && !$0.bench && $0.agent == nil }
             .map { $0.label.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.prefix(8)
         let open = titles.isEmpty ? "" : "; open there: " + titles.map { "«\($0)»" }.joined(separator: ", ")
         return "They asked from their space «\(browser.space.name)» (their other spaces: \(others))\(open). When a person, " +
@@ -461,7 +461,11 @@ extension Agents {
 
     static func given(_ context: [TaskContext], browser: Browser) -> String {
         var lines: [String] = []
+        // The last word on what a task is given: nothing of a tab hidden
+        // from AI, however it was attached.
+        let hidden = { (id: Tab.ID?) in browser.hiddenFromAI(id.flatMap(browser.chatTab)) }
         for item in context {
+            if hidden(item.tab) { continue }
             switch item.kind {
             case .page:
                 continue
@@ -483,7 +487,7 @@ extension Agents {
         }
         if context.contains(where: { $0.kind == .mail }) { lines.append(MailChat.rules) }
         if let page = context.first(where: { $0.kind == .page }), let id = page.tab,
-           let tab = browser.chatTab(id), !tab.shy, !context.isEmpty, lines.count < context.count {
+           let tab = browser.chatTab(id), !hidden(id), !context.isEmpty, lines.count < context.count {
             lines.insert("They were on their tab \(Bench.short(tab)) (\(tab.address?.absoluteString ?? "")) and gave it to you to read. " + PageWords.said(tab), at: 0)
         }
         return lines.isEmpty ? "" : lines.joined(separator: " ") + " "
@@ -638,14 +642,16 @@ final class TaskLine: ObservableObject {
         }
         // A private tab is nothing an agent sees: neither the page nor what
         // is selected on it goes with the task, which works in tabs of its
-        // own (TaskLineView says so where the page's pill would be).
-        context = tab.shy ? [] : [.page(tab)]
+        // own (TaskLineView says so where the page's pill would be). Nor
+        // is a tab in a space hidden from AI.
+        let hidden = tab.hiddenFromAI
+        context = hidden ? [] : [.page(tab)]
         PageWords.warm(tab)
         // The thing the pointer is on, a message or a thread, first.
-        if !tab.shy, selection == nil, let item = SiteItems.shared.pointed[tab.id] {
+        if !hidden, selection == nil, let item = SiteItems.shared.pointed[tab.id] {
             context.insert(.item(item), at: 0)
         }
-        if !tab.shy, let selection, !selection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if !hidden, let selection, !selection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             context.append(.selection(selection))
         }
         withAnimation(Motion.arrive) { self.tab = tab.id }

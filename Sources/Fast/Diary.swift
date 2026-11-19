@@ -662,7 +662,7 @@ final class Diary: @unchecked Sendable {
     func found(_ words: String, limit: Int = 8) async -> String {
         await withCheckedContinuation { done in
             queue.async {
-                let rows = (self.searchNow(words)["results"] as? [[String: Any]] ?? []).prefix(limit)
+                let rows = (self.searchNow(words, for: .ai)["results"] as? [[String: Any]] ?? []).prefix(limit)
                 let lines = rows.compactMap { row -> String? in
                     guard let url = row["url"] as? String, !url.isEmpty else { return nil }
                     let day = Date(timeIntervalSince1970: (row["at"] as? Double ?? 0) / 1000).formatted(date: .abbreviated, time: .omitted)
@@ -681,7 +681,7 @@ final class Diary: @unchecked Sendable {
     func pages(_ words: String, limit: Int = 8) async -> [Hit] {
         await withCheckedContinuation { done in
             queue.async {
-                let rows = (self.searchNow(words)["results"] as? [[String: Any]] ?? []).prefix(limit)
+                let rows = (self.searchNow(words, for: .ai)["results"] as? [[String: Any]] ?? []).prefix(limit)
                 done.resume(returning: rows.compactMap { row in
                     guard let url = row["url"] as? String, !url.isEmpty else { return nil }
                     let passage = (row["passage"] as? String).map {
@@ -721,7 +721,9 @@ final class Diary: @unchecked Sendable {
         }
     }
 
-    private func searchNow(_ typed: String) -> [String: Any] {
+    /// The History place's own search reads as the person; `found` and
+    /// `pages` go to a model or an agent (Diary.Reader).
+    private func searchNow(_ typed: String, for reader: Reader = .person) -> [String: Any] {
         guard db != nil else { return ["results": []] }
         let filter = self.filter(typed)
         let terms = Diary.terms(filter.words)
@@ -734,6 +736,7 @@ final class Diary: @unchecked Sendable {
         if let from = filter.from { clauses.append("p.last >= ?"); args.append(from.timeIntervalSince1970) }
         if let to = filter.to { clauses.append("p.last < ?"); args.append(to.timeIntervalSince1970) }
         if let host = filter.host { clauses.append("(p.host = ? OR p.host LIKE ?)"); args += [host, "%." + host] }
+        clauses.append(reader.page("p.key"))
         let scope = clauses.isEmpty ? "" : " AND " + clauses.joined(separator: " AND ")
 
         var rows: [SQLiteRow]

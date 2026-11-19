@@ -69,7 +69,12 @@ enum SignIns {
             else { return false }
             return SignIns.same(SignIns.site(there), site) && !SignIns.loginPage(url)
         }
-        let all = places(browser)
+        // A space hidden from AI is no place an agent signs in from; a
+        // store it shares with others is still theirs.
+        let all = places(browser).compactMap { place -> Place? in
+            let open = place.spaces.filter { !browser.hidesFromAI(space: $0.id) }
+            return open.isEmpty ? nil : Place(spaces: open, store: place.store)
+        }
         Task { @MainActor in
             var out: [Place] = []
             for var place in all {

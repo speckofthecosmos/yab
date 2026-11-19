@@ -618,10 +618,12 @@ final class Bench {
                 answer(["error": "that tab shows the person's saved cards, passwords or notes about them: an agent can't read or use it"])
                 return
             }
-            // Nor a private tab, for anything: to an agent it isn't there.
-            if find(request, in: browser)?.shy == true {
-                answer(missing(request))
-                return
+            // Nor a tab hidden from AI, for anything: a private tab isn't
+            // there to an agent; one in a space hidden from AI is refused.
+            switch browser.whyHiddenFromAI(find(request, in: browser)) {
+            case .privateTab: answer(missing(request)); return
+            case .space: answer(["error": HiddenFromAI.refusal]); return
+            case nil: break
             }
             let plain = answer
             answer = { plain(Wallet.hide($0) as? [String: Any] ?? $0) }
@@ -1988,7 +1990,7 @@ final class Bench {
 
         case "spaces":
             var out: [String: Any] = ["spaces": browser.spaces.map { ["name": $0.name, "id": $0.id.uuidString, "current": $0.id == browser.spaceID,
-                                                                    "own": $0.ownSignIns, "icon": $0.icon] },
+                                                                    "own": $0.ownSignIns, "icon": $0.icon, "hiddenFromAI": $0.has(.hiddenFromAI)] },
                                       "on": browser.prefs.usesSpaces, "parked": browser.parked.mapValues(\.tabs.count).count,
                                       // What this window shows: none in a private one (register 1015).
                                       "shown": browser.spacesShown, "foot": browser.footShowsSpaces, "named": browser.namesSpaces,
@@ -2593,8 +2595,14 @@ final class Bench {
             if Bench.mailLeaves(url, session: request["session"] as? String, browser: browser, answer: answer) { return }
             // "shy": in a private tab. Test runs only.
             let shy = Store.testing && request["shy"] as? Bool == true
-            func open(in space: UUID?, note: String?) {
+            func open(in named: UUID?, note: String?) {
                 guard allowed() else { answer(["error": "This task's permission expired."]); return }
+                // Never in a space hidden from AI, on screen or not.
+                var space = named
+                if request["session"] != nil {
+                    guard let away = browser.spaceForAgent(named) else { answer(["error": HiddenFromAI.spaceRefusal]); return }
+                    space = away
+                }
                 // `open` never borrows a user's tab, even for the exact URL.
                 // Work explicitly requested in an existing tab uses its id.
                 let session = request["session"] as? String
@@ -2637,6 +2645,7 @@ final class Bench {
                     answer(["error": "no space named \(name): \(browser.spaces.map(\.name).joined(separator: ", "))"])
                     return
                 }
+                if request["session"] != nil, browser.hidesFromAI(space: found.id) { answer(["error": HiddenFromAI.spaceRefusal]); return }
                 open(in: found.id, note: nil)
             } else if let host = url.host(), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
                 SignIns.pick(host, in: browser, allowed: allowed) { open(in: $0, note: $1) }

@@ -751,9 +751,9 @@ struct ChatComposer: View {
 
     /// A page a message can be about: loaded, not one of yab's own, and not
     /// private. A private tab is never attached, offered, pictured or read
-    /// for ideas: agents don't see one.
+    /// for ideas: agents don't see one. Nor a tab in a space hidden from AI.
     static func page(_ tab: Tab?) -> Tab? {
-        guard let tab, !tab.isBlank, !tab.shy, let url = tab.address, url.scheme == "http" || url.scheme == "https" else { return nil }
+        guard let tab, !tab.isBlank, !tab.hiddenFromAI, let url = tab.address, url.scheme == "http" || url.scheme == "https" else { return nil }
         return tab
     }
 
@@ -1536,7 +1536,7 @@ enum ChatAttachment: Equatable, Identifiable {
     /// Resolve the same pages for first messages and follow-ups, including Peek.
     @MainActor static func tabs(_ items: [ChatAttachment], in browser: Browser) -> [Tab] {
         items.compactMap { item in
-            guard case .tab(let id) = item, let tab = browser.chatTab(id), !tab.shy else { return nil }
+            guard case .tab(let id) = item, let tab = browser.chatTab(id), !browser.hiddenFromAI(tab) else { return nil }
             return tab
         }
     }

@@ -61,6 +61,27 @@ public enum AIUse {
         allows(use, level: level(in: defaults), rowsHidden: rowsHidden(in: defaults))
     }
 
+    /// `allows`, and not for a space hidden from AI (Settings › Spaces ›
+    /// Privacy), by the id a visit's space is written with.
+    public static func allows(_ use: Use, space: String?, in defaults: UserDefaults = Store.settings) -> Bool {
+        !hides(space) && allows(use, in: defaults)
+    }
+
+    private static let hiddenLock = NSLock()
+    nonisolated(unsafe) private static var hidden: Set<String> = []
+
+    /// The spaces hidden from AI, set by the app as it reads and writes its
+    /// spaces; read on the diary's queue and the agents' too.
+    public static var hiddenSpaces: Set<String> {
+        get { hiddenLock.lock(); defer { hiddenLock.unlock() }; return hidden }
+        set { hiddenLock.lock(); hidden = newValue; hiddenLock.unlock() }
+    }
+
+    public static func hides(_ space: String?) -> Bool {
+        guard let space, !space.isEmpty else { return false }
+        return hiddenSpaces.contains(space)
+    }
+
     public static func level(in defaults: UserDefaults = Store.settings) -> Level {
         defaults.string(forKey: key).flatMap(Level.init) ?? .on
     }

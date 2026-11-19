@@ -9611,7 +9611,8 @@ extension Browser: PageDownloadEvents {
             return
         }
         let url = DownloadDestinations.reserve(name, in: destinationFolder, for: download.downloadID)
-        if !download.isExtensionDownload {
+        // Named by a model later (DownloadNames).
+        if !download.isExtensionDownload, AIUse.allows(.background, for: download.page.flatMap { self.tab(owning: $0) }) {
             tidyDownloadFiles.insert(ObjectIdentifier(download))
             DownloadNames.warm(url.lastPathComponent, browser: self)
         }

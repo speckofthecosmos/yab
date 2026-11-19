@@ -496,9 +496,11 @@ extension History {
         return Dictionary(found, uniquingKeysWith: +).max { $0.value < $1.value }?.key
     }
 
-    /// The sites you go to most, by host: what Jev may pick from.
+    /// The sites you go to most, by host: what Jev may pick from. None
+    /// gone to in a space hidden from AI (SpacePrivacy): Jev is a model.
     func hosts(_ limit: Int) -> [String] {
-        let counts = visits(since: .distantPast).reduce(into: [String: Int]()) { counts, visit in
+        let clear = visits(since: .distantPast).filter { visit in !(visit.spaces ?? [:]).keys.contains(where: AIUse.hides) }
+        let counts = clear.reduce(into: [String: Int]()) { counts, visit in
             if let host = URL(string: visit.url)?.host()?.lowercased() { counts[host, default: 0] += visit.count }
         }
         return counts.sorted { $0.value > $1.value }.prefix(limit).map(\.key)

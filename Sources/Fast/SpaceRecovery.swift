@@ -25,8 +25,9 @@ enum SpaceRecovery {
                     continue
                 }
                 // A malformed look or a new optional field must not discard
-                // the space's identity, name and known sign-in ownership.
-                let core = row.filter { ["id", "name", "icon", "ownSignIns", "origin", "brought", "signedInAs", "signInWith"].contains($0.key) }
+                // the space's identity, name and known sign-in ownership,
+                // nor its privacy.
+                let core = row.filter { ["id", "name", "icon", "ownSignIns", "origin", "brought", "signedInAs", "signInWith", "privacy"].contains($0.key) }
                 if let bytes = try? JSONSerialization.data(withJSONObject: core),
                    let space = try? JSONDecoder().decode(Space.self, from: bytes) { recovered.append(space) }
             }

@@ -367,7 +367,7 @@ final class PageWatches: ObservableObject {
     /// A check that stopped reading the page: an agent writes it again,
     /// once, and says nothing to the user unless the page is gone.
     private func wake(_ watch: PageWatch) {
-        guard Agents.installed else { return }
+        guard Agents.installed, AIUse.allows(.background, space: watch.space) else { return }
         let choice = ModelDefaults.shared.pick(.tasks)
         let prompt = """
         Yab watches \(watch.url) for the user (\(watch.name): \(watch.until)) with a check you wrote, and the check \

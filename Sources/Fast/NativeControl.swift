@@ -203,9 +203,10 @@ final class NativeControl {
     }
 
     private func tab(_ id: String, browser: Browser) throws -> Tab {
-        guard let tab = (browser.tabs + browser.parkedTabs).first(where: { !$0.shy && ($0.id.uuidString == id || Bench.short($0) == id) }) else {
-            throw NativeFailure("not_found", "No such tab")
-        }
+        let tab = (browser.tabs + browser.parkedTabs).first { $0.id.uuidString == id || Bench.short($0) == id }
+        let why = browser.whyHiddenFromAI(tab)
+        guard let tab, why != .privateTab else { throw NativeFailure("not_found", "No such tab") }
+        if why == .space { throw NativeFailure("hidden_from_ai", HiddenFromAI.refusal) }
         return tab
     }
 
@@ -453,7 +454,8 @@ final class NativeControl {
         // The first tab at each address, for the ones after it: "close my
         // duplicates" (tabs.close).
         var firstAt: [String: UUID] = [:]
-        for tab in browser.tabs where !tab.shy && !tab.bench {
+        let hidden = browser.hiddenFromAI
+        for tab in browser.tabs where !hidden(tab) && !tab.bench {
             if let key = Self.sameAddress(tab), firstAt[key] == nil { firstAt[key] = tab.id }
         }
         func metadata(_ tab: Tab) -> [String: Any] {
@@ -464,21 +466,21 @@ final class NativeControl {
                     "visible": browser.tabs.contains { $0 === tab }, "kept": tab.kept, "blank": tab.isBlank, "folderId": tab.nest?.id.uuidString ?? "", "folderName": tab.nest?.name ?? "",
                     // The folders it is in from the top, a folder in a folder's included.
                     "folderPath": tab.nest.map { $0.chain.map(\.name).joined(separator: " \u{203A} ") } ?? "",
-                    "splitPartnerId": browser.partner(of: tab).flatMap { $0.shy ? nil : $0.id.uuidString } ?? "",
+                    "splitPartnerId": browser.partner(of: tab).flatMap { hidden($0) ? nil : $0.id.uuidString } ?? "",
                     "ownedByTask": tab.agent == session.id, "resourceVersion": changes.version("tab:" + tab.id.uuidString, tabState(tab)),
                     // When the user last looked at it: "close what I haven't used in a week".
                     "lastUsed": tab.touched.ISO8601Format(),
                     "duplicateOf": Self.sameAddress(tab).flatMap { firstAt[$0] }.flatMap { $0 == tab.id ? nil : $0.uuidString } ?? ""]
         }
         let shared = browser.sharedPins ?? []
-        let visible = (browser.tabs + shared.filter { pin in !browser.tabs.contains { $0 === pin } }).filter { !$0.shy }
+        let visible = (browser.tabs + shared.filter { pin in !browser.tabs.contains { $0 === pin } }).filter { !hidden($0) }
         let offset = max(0, request["offset"] as? Int ?? 0)
         let limit = min(50, max(1, request["limit"] as? Int ?? 10))
         let spaces = browser.spaces.map { space -> [String: Any] in
             let state = spaceState(space, browser: browser)
             return ["id": space.id.uuidString, "name": space.name, "active": space.id == browser.spaceID,
                     "authStoreId": space.ownSignIns ? Spaces.signIn(of: space.id).uuidString : Space.firstID.uuidString,
-                    "separateSignIns": space.ownSignIns, "showsSharedPins": browser.showsShared(space.id), "appearance": state.any, "resourceVersion": changes.version("space:" + space.id.uuidString, state)]
+                    "separateSignIns": space.ownSignIns, "hiddenFromAI": space.has(.hiddenFromAI), "showsSharedPins": browser.showsShared(space.id), "appearance": state.any, "resourceVersion": changes.version("space:" + space.id.uuidString, state)]
         }
         let accounts = MailCenter.shared.accounts.map { account -> [String: Any] in
             let status = MailCenter.shared.status[account]
@@ -498,12 +500,12 @@ final class NativeControl {
                                   "tabs": visible.dropFirst(offset).prefix(limit).map(metadata), "hasMoreTabs": visible.count > offset + limit,
                                   "task": ["id": session.id, "prompt": String(session.prompt.prefix(2000)), "state": session.state.rawValue],
                                   "operations": changes.receipts.filter { $0.session == session.id }.suffix(12).map { ["id": $0.id, "action": $0.action, "status": $0.status] }]
-        if let active = browser.active, !active.shy { out["activeTab"] = metadata(active) }
+        if let active = browser.active, !hidden(active) { out["activeTab"] = metadata(active) }
         out["activeSpaceId"] = browser.spaceID.uuidString
         out["coverage"] = ["privateTabsExcluded": true, "parkedTabsIncluded": false, "parkedSharedPinsIncluded": true,
-                           "visibleTabCount": browser.tabs.filter { !$0.shy }.count]
+                           "visibleTabCount": browser.tabs.filter { !hidden($0) }.count]
         out["pinsInEverySpace"] = browser.pinsShared
-        let selection = browser.chosen.filter { !$0.shy && !$0.bench }
+        let selection = browser.chosen.filter { !hidden($0) && !$0.bench }
         out["selectedTabIds"] = selection.prefix(50).map { $0.id.uuidString }
         out["selectionCount"] = selection.count
         out["hasMoreSelectedTabs"] = selection.count > 50
@@ -515,7 +517,7 @@ final class NativeControl {
         }
         // Folders of the space on screen, a folder before the folders in it:
         // targets of tabs.move_to_folder and folder.ungroup.
-        out["folders"] = browser.nests.map { folderSummary($0, browser: browser) }
+        out["folders"] = browser.hidesFromAI(space: browser.spaceID) ? [] : browser.nests.map { folderSummary($0, browser: browser) }
         out["liveFolders"] = ["enabled": browser.prefs.usesLiveFolders,
                               "folders": LiveFolderSummary.all(in: browser).map { liveSummary($0, browser: browser) },
                               "sources": NativeActions.liveSources.compactMap(LiveSource.of).map {
@@ -584,6 +586,15 @@ final class NativeControl {
         guard rawTarget["kind"] as? String == descriptor["targetKind"] as? String, let rawID = rawTarget["id"] as? String,
               (1...160).contains(rawID.count), rawTarget["kind"] as? String != "application" || rawID == "app" else { throw NativeFailure("invalid_arguments", "Give an explicit target of the action's targetKind") }
         let target = ["space", "liveFolder", "folder"].contains(rawTarget["kind"] as? String ?? "") ? UUID(uuidString: rawID)?.uuidString ?? rawID : rawID
+        // Nothing in a space hidden from AI: neither the space itself nor
+        // the row and folders of one on screen.
+        switch rawTarget["kind"] as? String ?? "" {
+        case "space" where UUID(uuidString: target).map(browser.hidesFromAI(space:)) == true,
+             "tab" where browser.hidesFromAI(space: browser.spaceID),
+             "folder" where browser.hidesFromAI(space: browser.spaceID):
+            throw NativeFailure("hidden_from_ai", HiddenFromAI.spaceRefusal)
+        default: break
+        }
         guard let rawArguments = request["arguments"] as? [String: Any] else { throw NativeFailure("invalid_arguments", "Arguments must be an object") }
         guard case .object(let arguments) = try NativeValue.read(rawArguments) else { throw NativeFailure("invalid_arguments", "Arguments must be an object") }
         try NativeActions.validate(arguments, descriptor: descriptor)

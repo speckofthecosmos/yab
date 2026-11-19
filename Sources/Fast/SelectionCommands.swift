@@ -1043,6 +1043,11 @@ final class SelectionCommands: ObservableObject {
         // Words asked in the field, nothing selected: a question, not a
         // text to transform.
         let asking = snap.text.isEmpty && command.id == "ask"
+        // What is selected on a page in a space hidden from AI goes to no
+        // model; a question typed over one goes without it.
+        if !asking, tab?.whyHiddenFromAI == .space {
+            throw SelectionError.message("This space is hidden from AI. Move the page to another space to use it here.")
+        }
         let full = asking ? await question(command.prompt, snapshot: snap) : await transform(command, snapshot: snap)
         if command.executor == "local" { return snap.text }
         if command.executor == "mac" {
@@ -1084,7 +1089,7 @@ final class SelectionCommands: ObservableObject {
     /// agent is text only (`ask`), so the page's words can ask it nothing.
     private func question(_ words: String, snapshot snap: SelectionSnapshot) async -> String {
         var parts = ["Answer this question the user typed into their browser's address field. The answer first, in a sentence or a few short lines, Markdown if it helps, no preamble, in the language of the question."]
-        if !snap.url.isEmpty, let tab {
+        if !snap.url.isEmpty, let tab, !tab.hiddenFromAI {
             // Read when the field came up over it, most likely (PageWords).
             let text = await PageWords.read(tab)
             parts.append("The page they have open, which the question may be about, or not at all:\n\(snap.title)\n\(snap.url)\n\n\(text)")

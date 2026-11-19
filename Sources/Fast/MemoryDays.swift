@@ -84,7 +84,8 @@ extension Diary {
         // The browser's own diary only: a test's scratch one writes no notes.
         guard self === Diary.shared, Store.settings.object(forKey: "agents.forget") as? Bool != true, let date = Diary.day(named: day),
               let next = Calendar.current.date(byAdding: .day, value: 1, to: date) else { return }
-        let lines = threadsNow(from: date, to: next).filter { $0.day == day }.map(DayNotes.line)
+        // Agents read the note (Diary.Reader).
+        let lines = threadsNow(from: date, to: next, for: .ai).filter { $0.day == day }.map(DayNotes.line)
         Memory.prepare()
         let url = Memory.folder.appendingPathComponent("episodic/\(day).md")
         let body = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
@@ -96,6 +97,20 @@ extension Diary {
             // Memory's list reads its notes again as it comes up: nothing
             // is read on the main thread while you browse.
         } catch {}
+    }
+
+    /// A space hidden from AI or let back (Browser.setPrivacy): the notes of
+    /// the days with a thread holding a page seen in it, written again.
+    func rewriteDayNotes(of space: String) {
+        queue.async {
+            guard self.db != nil else { return }
+            for day in self.strings("""
+            SELECT DISTINCT t.day FROM threads t JOIN visits v ON v.thread = t.id
+            WHERE v.key IN (SELECT key FROM visits WHERE space = ?)
+            """, [space]) {
+                self.writeDayNote(day)
+            }
+        }
     }
 }
 

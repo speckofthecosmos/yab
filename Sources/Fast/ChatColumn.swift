@@ -274,10 +274,10 @@ extension Browser {
             return
         }
         // A private tab gives nothing of its own: not the page, not what is
-        // selected on it (ChatComposer.page).
+        // selected on it (ChatComposer.page). Nor one in a space hidden from AI.
         let given = context.isEmpty
-            ? (tab.shy ? [] : [TaskContext.page(tab)] + (selection.map { [TaskContext.selection($0)] } ?? []))
-            : context.filter { item in item.tab.map { id in chatTab(id)?.shy != true } ?? true }
+            ? (hiddenFromAI(tab) ? [] : [TaskContext.page(tab)] + (selection.map { [TaskContext.selection($0)] } ?? []))
+            : context.filter { item in item.tab.map { id in !hiddenFromAI(chatTab(id)) } ?? true }
         for item in given { if let tab = item.tab.flatMap(chatTab) { PageWords.warm(tab) } }
         // The new chat first: the words below are its draft (chatDraft).
         newChat()
@@ -2926,7 +2926,8 @@ extension Agents {
         guard followUpProblem(id) == nil else { return }
         // What it was pointed at: said in the message, the words shown alone.
         var tabs = browser.map { ChatAttachment.tabs(attached, in: $0) } ?? []
-        if let tab, !tabs.contains(where: { $0.id == tab.id }) { tabs.insert(tab, at: 0) }
+        // Never a tab hidden from AI (SpacePrivacy).
+        if let tab, !tab.hiddenFromAI, !tabs.contains(where: { $0.id == tab.id }) { tabs.insert(tab, at: 0) }
         let quotes = attached.compactMap(\.quote)
         let mail = attached.compactMap(\.mail).map(MailChat.filled)
         let folders = attached.compactMap(\.folder).compactMap { id in browser?.nests.first { $0.id == id } }

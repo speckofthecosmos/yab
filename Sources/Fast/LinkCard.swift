@@ -362,7 +362,8 @@ final class LinkCard {
                 displayedGeneration = generation
                 draw()
                 async let picture: Void = loadImage(page, url: loader.page.address ?? point.url, store: point.source.store, generation: generation)
-                if model.phase != "unavailable" {
+                // Otherwise the card keeps its title and picture.
+                if model.phase != "unavailable", AIUse.allows(.background, for: point.source) {
                     await LinkSummary.preview(page, cloud: !point.source.shy) { [weak self] preview in
                         guard let self, self.serial == generation, !Task.isCancelled else { return }
                         self.model.preview = preview

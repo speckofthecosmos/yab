@@ -58,6 +58,9 @@ struct Space: Codable, Identifiable, Equatable {
     /// tab of one, open or opened later, until it is let back in from any
     /// of them (Browser.toggleSiteMute). Nil for none.
     var mutedSites: [String]? = nil
+    /// Hide from AI, Don't Keep Day Threads, Don't Keep History
+    /// (SpacePrivacy). This Mac's choices, not synced. Nil for none.
+    var privacy: SpacePrivacy? = nil
     /// The engine the field searches with in it, an Engine's raw value
     /// (EngineChoice.space). Nil for Settings › Search's, the default.
     var search: String? = nil
@@ -356,6 +359,7 @@ enum Spaces {
         }
         routes = routing(saved)
         sharing = Set(saved.filter { !$0.ownSignIns }.map(\.id))
+        SpacePrivacy.take(saved)
         // Symbols from before, each its emoji, written back once; one
         // picked from the Icon tab (SpaceSymbols) stays.
         let old = { (icon: String) in !isEmoji(icon) && !SpaceSymbols.all.contains { $0.symbol == icon } }
@@ -417,6 +421,7 @@ enum Spaces {
         try? data.write(to: file, options: .atomic)
         routes = routing(spaces)
         sharing = Set(spaces.filter { !$0.ownSignIns }.map(\.id))
+        SpacePrivacy.take(spaces)
         NotificationCenter.default.post(name: changed, object: nil)
     }
 

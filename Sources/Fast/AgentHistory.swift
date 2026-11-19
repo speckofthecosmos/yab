@@ -17,6 +17,8 @@ import SQLite3
 //
 // Read-only, on a queue of its own: the diary's file in WAL mode takes a
 // reader beside its writer, and other browsers' files are read from a copy.
+//
+// An agent reads it: the diary as AI reads it (Diary.Reader).
 
 enum AgentHistory {
     struct Site {
@@ -56,7 +58,7 @@ enum AgentHistory {
             all[key] = site
             scanned += 1
         }
-        let yab = diaryVisits(since: since)
+        let yab = diaryVisits(since: since, for: .ai)
         if !yab.isEmpty { sources.append("Yab") }
         for visit in yab { add(visit.url, at: visit.at, signIn: Diary.isSignIn(visit.url)) }
         for source in (AgentFixture.requested ? [] : OtherHistory.sources()) {
@@ -116,12 +118,12 @@ enum AgentHistory {
                 guard !match.isEmpty else { return }
                 sql = """
                 SELECT p.title, p.url, p.last FROM words w JOIN pages p ON p.key = w.key
-                WHERE words MATCH ? AND p.last >= ? \(host == nil ? "" : "AND p.host = ?")
+                WHERE words MATCH ? AND p.last >= ? \(host == nil ? "" : "AND p.host = ?") AND \(Diary.Reader.ai.page("p.key"))
                 GROUP BY p.key ORDER BY p.last DESC LIMIT \(limit)
                 """
                 args = [match]
             } else {
-                sql = "SELECT title, url, last FROM pages WHERE last >= ? AND host = ? ORDER BY last DESC LIMIT \(limit)"
+                sql = "SELECT p.title, p.url, p.last FROM pages p WHERE p.last >= ? AND p.host = ? AND \(Diary.Reader.ai.page("p.key")) ORDER BY p.last DESC LIMIT \(limit)"
             }
             var statement: OpaquePointer?
             guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else { return }
@@ -148,7 +150,7 @@ enum AgentHistory {
         let span = when.flatMap { DayThreads.span($0, now: now) } ?? query.flatMap { DayThreads.span($0, now: now) }
         let from = span?.from ?? now.addingTimeInterval(-Double(days) * 86_400)
         let to = span?.to ?? now.addingTimeInterval(60)
-        var threads = await diary.threads(from: from, to: to)
+        var threads = await diary.threads(from: from, to: to, for: .ai)
         let terms = Diary.terms(span?.rest ?? query ?? "").filter { $0.count >= 3 && !DayThreads.common.contains($0) && !AskFromDay.askWords.contains($0) }
         if !terms.isEmpty {
             let matched = threads.filter { thread in
@@ -204,7 +206,7 @@ enum AgentHistory {
         defer { known.unlock() }
         if let cached = knownCache, Date().timeIntervalSince(cached.at) < 600 { return cached.hosts }
         let since = Date().addingTimeInterval(-Double(days) * 86_400)
-        var hosts = Set(diaryVisits(since: since).compactMap { $0.url.host().map(clean) })
+        var hosts = Set(diaryVisits(since: since, for: .ai).compactMap { $0.url.host().map(clean) })
         for source in OtherHistory.sources() {
             hosts.formUnion(chromiumVisits(source, since: since).compactMap { $0.url.host().map(clean) })
         }
@@ -283,10 +285,12 @@ enum AgentHistory {
         work(db)
     }
 
-    private static func diaryVisits(since: Date) -> [(url: URL, at: Date, title: String)] {
+    /// The person's own counts (routine ideas, what is paid for) read it
+    /// all; what an agent reads, `.ai`.
+    private static func diaryVisits(since: Date, for reader: Diary.Reader = .person) -> [(url: URL, at: Date, title: String)] {
         var out: [(URL, Date, String)] = []
         withDiary { db in
-            let sql = "SELECT p.url, v.at, p.title FROM visits v JOIN pages p ON p.key = v.key WHERE v.at >= ?"
+            let sql = "SELECT p.url, v.at, p.title FROM visits v JOIN pages p ON p.key = v.key WHERE v.at >= ? AND " + reader.page("p.key")
             var statement: OpaquePointer?
             guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else { return }
             defer { sqlite3_finalize(statement) }

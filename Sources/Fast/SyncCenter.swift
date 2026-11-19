@@ -1720,6 +1720,8 @@ final class SyncCenter: ObservableObject {
                     space.signedInAs = local[space.id]?.signedInAs
                 }
                 space.mutedSites = local[space.id]?.mutedSites
+                // This Mac's choices: another device's list never undoes them.
+                space.privacy = local[space.id]?.privacy
                 return space
             }
             // Catch-up is paged: absence from the journal is not a deletion.

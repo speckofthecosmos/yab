@@ -492,7 +492,7 @@ extension Browser {
         selectionCommands.close()
         close()
         guard Agents.ready else { TaskLine.connect(); return true }
-        Agents.shared.task(words, context: tab.shy ? [] : [.page(tab)], on: nil)
+        Agents.shared.task(words, context: hiddenFromAI(tab) ? [] : [.page(tab)], on: nil)
         return true
     }
 
@@ -640,7 +640,8 @@ extension Browser {
         }
         close()
         guard Agents.ready else { TaskLine.connect(); return }
-        if asked, snap.url.isEmpty {
+        // A page in a space hidden from AI goes with no task (SpacePrivacy).
+        if whyHiddenFromAI(tab) == .space || (asked && snap.url.isEmpty) {
             if let session = Agents.shared.task(words, context: [], on: nil) { showChat(session.id) }
         } else {
             let context = asked ? [TaskContext.page(tab)] : [TaskContext(kind: .selection, title: "Selection", url: tab.address, tab: tab.id, text: snap.text)]

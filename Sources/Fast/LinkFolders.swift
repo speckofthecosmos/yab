@@ -37,7 +37,7 @@ enum LinkFolders {
     static func name(_ nest: Nest, in browser: Browser) {
         nest.name = fallback(among: browser)
         // Settings › AI › While You Browse › Folder Names off: Folder N.
-        guard browser.prefs.folderNames, AIUse.allows(.background) else { return }
+        guard browser.prefs.folderNames, AIUse.allows(.background, space: browser.spaceID) else { return }
         guard stand != nil || !agents.isEmpty || FormModel.ready else { return }
         Rename.warm()
         nest.unnamed = true

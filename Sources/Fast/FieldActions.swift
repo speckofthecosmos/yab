@@ -64,7 +64,8 @@ struct Candidates {
             return tokens.contains { text.contains($0) }
         }
         // Open tabs whose title or site the words name, else the latest.
-        let open = browser.tabs.filter { !$0.isBlank }
+        // Never one in a space hidden from AI: these go to the model.
+        let open = browser.tabs.filter { !$0.isBlank && browser.whyHiddenFromAI($0) != .space }
         let named = open.filter { matches($0.title + " " + ($0.address?.host() ?? "")) }
         found.tabs = Array((named.isEmpty ? open.sorted { $0.touched > $1.touched } : named).prefix(16))
         // Pages from the history's text: every meaningful word, then each

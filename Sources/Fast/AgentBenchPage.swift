@@ -851,9 +851,14 @@ extension Bench {
                 answer(["error": "no space named \(name): \(browser.spaces.map(\.name).joined(separator: ", "))"])
                 return
             }
+            if browser.hidesFromAI(space: found.id) { answer(["error": HiddenFromAI.spaceRefusal]); return }
             read(in: found.id, note: nil)
         } else {
-            SignIns.pick(host, in: browser, allowed: allowed) { read(in: $0 ?? Spaces.current, note: $1) }
+            SignIns.pick(host, in: browser, allowed: allowed) { picked, note in
+                // Never in a space hidden from AI (Browser.spaceForAgent).
+                guard let away = browser.spaceForAgent(picked) else { answer(["error": HiddenFromAI.spaceRefusal]); return }
+                read(in: away ?? Spaces.current, note: note)
+            }
         }
     }
 
@@ -925,8 +930,8 @@ extension Bench {
         var seen: Set<Tab.ID> = []
         let rows = listed.compactMap { tab -> [String: Any]? in
             guard seen.insert(tab.id).inserted else { return nil }
-            // A private tab isn't an agent's to know of.
-            guard !tab.shy else { return nil }
+            // A private tab isn't an agent's to know of, nor one hidden from AI.
+            guard !browser.hiddenFromAI(tab) else { return nil }
             if let grant, !grant.permits(tab, in: browser) { return nil }
             if let grant, !tab.bench, Assistants.shared.refusal(grant, url: tab.address ?? tab.pending) != nil { return nil }
             var row = describe(tab)

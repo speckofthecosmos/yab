@@ -42,7 +42,10 @@ extension Browser {
 
     /// Whether Tidy stands on the line now.
     var canTidyTabs: Bool {
+        // Not in a space hidden from AI: its titles would go to a model.
+        // Tidy has its own switch, not AI in Yab's (FormModel.tidyReady).
         prefs.tidyTabs && !tabsTidying && dusting.isEmpty && tidyTabsLoose.count >= Browser.tidyTabsFrom && TidyTabs.can
+            && !hidesFromAI(space: spaceID)
     }
 
     /// Tidy: today's tabs asked about, and put in folders by the answer.

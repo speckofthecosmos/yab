@@ -89,6 +89,11 @@ final class BoostAPI {
               Boosts.shared.trials[tab.id]?.package.id != id else {
             throw BoostPackage.Invalid("This API needs a kept, enabled plugin and its declared permission on an allowed page.")
         }
+        // A plugin on a page in a space hidden from AI asks no model and
+        // starts no task there.
+        if ["ask", "summarize", "task"].contains(method), browser.whyHiddenFromAI(tab) == .space {
+            throw BoostPackage.Invalid("This space is hidden from AI.")
+        }
         guard active[id, default: 0] < 2 else { throw BoostPackage.Invalid("Two plugin requests are already running. Wait for one to finish.") }
         active[id, default: 0] += 1
         defer { active[id, default: 0] -= 1 }

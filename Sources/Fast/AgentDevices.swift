@@ -65,7 +65,8 @@ enum AgentDevices {
         let spaces = Dictionary(journal.living(SyncShapes.space).compactMap(SyncSpace.init).map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
         var tabs: [String: [SyncTab]] = [:]
         for tab in journal.living(SyncShapes.tab).compactMap(SyncTab.init) where tab.list == .today {
-            guard let device = tab.device, device != me else { continue }
+            // Never a tab of a space this Mac hides from AI (SpacePrivacy).
+            guard let device = tab.device, device != me, !AIUse.hides(tab.space.uppercased()) else { continue }
             tabs[device, default: []].append(tab)
         }
         let others = names.keys.filter { $0 != me }
